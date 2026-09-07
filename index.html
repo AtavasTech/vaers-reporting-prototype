@@ -821,6 +821,7 @@ function onFieldInput(e){
   var fid=id.slice(2).split("_")[0];
   var f=findField(fid)||findField(id.slice(2));
   if(!f) return;
+
   if(f.type==="checkbox"){
     var arr=[];document.querySelectorAll('input[name="f_'+f.id+'"]:checked').forEach(function(n){arr.push(n.value);});
     values[f.id]=arr;
@@ -829,15 +830,33 @@ function onFieldInput(e){
   } else {
     values[f.id]=e.target.value;
   }
+
   if(submitted) runValidation();
+
+  /* Do not rebuild the form on every keystroke. Recreating a textarea/input
+     during the input event resets the caret/focus in some browsers and makes
+     normal typing appear broken. Text-like controls keep their live DOM value
+     while the user types; we re-render on change/blur. Controls that can alter
+     branching still re-render immediately. */
+  var textLike = (f.type==="textarea" || f.type==="text" || f.type==="email" ||
+                  f.type==="tel" || f.type==="date");
+  if(e.type==="input" && textLike) return;
+
   var active=document.activeElement?document.activeElement.id:null;
   renderForm();
-  if(active){var el=document.getElementById(active);
-    if(el){el.focus();if(el.setSelectionRange&&el.type==="text"){try{var n=el.value.length;el.setSelectionRange(n,n);}catch(x){}}}}
+  if(active){
+    var el=document.getElementById(active);
+    if(el){
+      el.focus();
+      if(el.setSelectionRange && (el.tagName==="TEXTAREA" || el.type==="text" || el.type==="email" || el.type==="tel")){
+        try{var n=el.value.length;el.setSelectionRange(n,n);}catch(x){}
+      }
+    }
+  }
 }
-/* Bind both events: text inputs fire "input"; some browsers only fire "change"
-   for <select>, radio and checkbox. A re-render is idempotent, so double-firing
-   is harmless and single-firing is guaranteed. */
+/* Text-like fields update state on each input event without rebuilding the DOM,
+   then re-render on change/blur. Select/radio/checkbox controls continue to
+   re-render immediately so branching remains live. */
 document.addEventListener("input", onFieldInput);
 document.addEventListener("change", onFieldInput);
 
