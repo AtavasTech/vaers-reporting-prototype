@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modernized VAERS Reporting — Working Prototype | Atavas Technologies LLC</title>
+<style>
+:root{
+  --navy:#1a3a6b; --navy-dk:#12294c; --ink:#1b1b1b; --muted:#4a4a4a;
+  --line:#c9ced6; --bg:#f7f8fa; --panel:#fff; --accent:#0b6b52;
+  --err:#b32418; --errbg:#fdf0ee; --warnbg:#fff8e6; --warnline:#e0a800;
+  --trace:#f0f4fa; --focus:#d64d00; --radius:6px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color:var(--ink);background:var(--bg)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.skip{position:absolute;left:-9999px;top:0;background:#fff;color:var(--navy);padding:12px 18px;z-index:100;
+  font-weight:700;border:2px solid var(--navy)}
+.skip:focus{left:8px;top:8px}
+header.site{background:var(--navy);color:#fff;padding:14px 20px}
+.hwrap{max-width:1240px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.brand{font-size:1.05rem;font-weight:700;letter-spacing:.2px}
+.brand small{display:block;font-weight:400;font-size:.78rem;opacity:.9;letter-spacing:0}
+.hctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.banner{background:var(--warnbg);border-bottom:1px solid var(--warnline);padding:9px 20px;font-size:.86rem}
+.banner div{max-width:1240px;margin:0 auto}
+nav.tabs{background:var(--navy-dk);padding:0 20px}
+nav.tabs ul{max-width:1240px;margin:0 auto;padding:0;list-style:none;display:flex;flex-wrap:wrap}
+nav.tabs button{background:none;border:0;border-bottom:4px solid transparent;color:#dbe4f0;
+  padding:12px 16px;font-size:.92rem;font-family:inherit;cursor:pointer}
+nav.tabs button[aria-selected="true"]{color:#fff;border-bottom-color:#ffb84d;font-weight:700}
+nav.tabs button:hover{color:#fff;background:rgba(255,255,255,.07)}
+main{max-width:1240px;margin:0 auto;padding:22px 20px 60px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:22px;align-items:start}
+@media(max-width:960px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:18px}
+.panel h2{margin:0 0 4px;font-size:1.18rem;color:var(--navy)}
+.panel h3{margin:18px 0 6px;font-size:1rem;color:var(--navy)}
+.sub{color:var(--muted);font-size:.88rem;margin:0 0 14px}
+fieldset{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin:0 0 16px}
+legend{font-weight:700;color:var(--navy);padding:0 6px;font-size:1rem}
+.field{margin-bottom:16px}
+.field:last-child{margin-bottom:0}
+label.lab,.grouplab{display:block;font-weight:600;margin-bottom:3px}
+.req{color:var(--err);font-weight:700}
+.hint{font-size:.85rem;color:var(--muted);margin:0 0 6px}
+input[type=text],input[type=date],input[type=email],input[type=tel],select,textarea{
+  width:100%;padding:9px 10px;font:inherit;font-size:.95rem;border:1px solid #767676;
+  border-radius:4px;background:#fff;color:var(--ink)}
+textarea{min-height:96px;resize:vertical}
+input[aria-invalid="true"],select[aria-invalid="true"],textarea[aria-invalid="true"]{
+  border:2px solid var(--err);background:var(--errbg)}
+.opt{display:flex;gap:9px;align-items:flex-start;margin:5px 0;padding:7px 9px;border:1px solid transparent;border-radius:4px}
+.opt:hover{background:#eef2f8;border-color:var(--line)}
+.opt input{margin:3px 0 0;width:19px;height:19px;flex:0 0 auto}
+.opt label{font-weight:400;cursor:pointer}
+.err{color:var(--err);font-size:.85rem;font-weight:600;margin-top:4px;display:block}
+.summary{border:2px solid var(--err);background:var(--errbg);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px}
+.summary h3{margin:0 0 6px;color:var(--err);font-size:1rem}
+.summary ol{margin:0;padding-left:20px}
+.summary a{color:var(--err)}
+button.btn{background:var(--navy);color:#fff;border:0;border-radius:4px;padding:11px 20px;
+  font:inherit;font-weight:600;cursor:pointer}
+button.btn:hover{background:var(--navy-dk)}
+button.ghost{background:#fff;color:var(--navy);border:2px solid var(--navy)}
+button.ghost:hover{background:#eef2f8}
+button.sm{padding:6px 11px;font-size:.84rem}
+.tgl{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.4);border-radius:20px;padding:5px 12px;color:#fff;font-size:.84rem}
+.tgl input{width:17px;height:17px;margin:0}
+.pill{display:inline-block;background:#eef2f8;border:1px solid var(--line);border-radius:12px;
+  padding:2px 10px;font-size:.76rem;color:var(--navy);font-weight:600;margin:0 5px 5px 0}
+.pill.on{background:#e6f4ef;border-color:#9ccdba;color:var(--accent)}
+.pill.off{background:#f2f2f2;color:#666}
+.trace{background:var(--trace);border:1px solid var(--line);border-radius:var(--radius);padding:14px;font-size:.85rem}
+.trace h3{margin:0 0 8px;font-size:.95rem;color:var(--navy)}
+.trow{padding:7px 0;border-bottom:1px solid #dde3ec}
+.trow:last-child{border-bottom:0}
+.tname{font-weight:700}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
+.cond{display:block;color:#33415c;margin-top:2px;word-break:break-word}
+.yes{color:var(--accent);font-weight:700}
+.no{color:#8a5a00;font-weight:700}
+pre{background:#12294c;color:#e8eef7;padding:15px;border-radius:var(--radius);overflow:auto;
+  font-size:.8rem;line-height:1.5;max-height:560px}
+.assist{background:#e6f4ef;border-left:5px solid var(--accent);border-radius:4px;padding:11px 13px;
+  margin-top:8px;font-size:.88rem}
+.assist strong{color:var(--accent);display:block;margin-bottom:3px;font-size:.8rem;text-transform:uppercase;letter-spacing:.4px}
+table{border-collapse:collapse;width:100%;font-size:.88rem;margin:8px 0 14px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:#eef2f8;color:var(--navy)}
+.adminrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.adminrow{grid-template-columns:1fr}}
+.note{background:#eef2f8;border-left:5px solid var(--navy);padding:11px 14px;border-radius:4px;font-size:.88rem;margin:12px 0}
+.file{border:2px dashed var(--line);border-radius:var(--radius);padding:16px;text-align:center;background:#fafbfd}
+ul.docs{list-style:none;padding:0;margin:10px 0 0}
+ul.docs li{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  border:1px solid var(--line);border-radius:4px;padding:8px 11px;margin-bottom:6px;font-size:.88rem;background:#fff}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.ok{background:#e6f4ef;border:1px solid #9ccdba;border-radius:var(--radius);padding:16px;margin-bottom:16px}
+.ok h2{color:var(--accent);margin-top:0}
+footer{background:var(--navy-dk);color:#c6d3e6;padding:20px;font-size:.82rem}
+footer div{max-width:1240px;margin:0 auto}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="site">
+  <div class="hwrap">
+    <div class="brand">Modernized VAERS Reporting — Working Prototype
+      <small>Atavas Technologies LLC &nbsp;|&nbsp; RFQ 75D301-26-Q-00146 &nbsp;|&nbsp; Volume I, Tab 2-2</small></div>
+    <div class="hctl">
+      <label class="tgl" for="lang"><span>Idioma / Language</span>
+        <select id="lang" style="width:auto;padding:3px 6px;font-size:.84rem;color:#1b1b1b">
+          <option value="en">English</option><option value="es">Español</option>
+        </select></label>
+      <label class="tgl" for="aiToggle"><input type="checkbox" id="aiToggle">
+        <span>AI assistance layer</span></label>
+    </div>
+  </div>
+</header>
+
+<div class="banner"><div><strong>Prototype notice.</strong> Demonstration only, using
+<strong>synthetic, non-production data</strong>. Not connected to VAERS. Do not enter real personal or health
+information. Nothing entered here is transmitted or stored — all state is held in browser memory only.</div></div>
+
+<nav class="tabs" aria-label="Prototype sections">
+  <ul id="tablist" role="tablist">
+    <li role="presentation"><button role="tab" id="t-report" aria-controls="p-report" aria-selected="true">Reporting Form</button></li>
+    <li role="presentation"><button role="tab" id="t-admin" aria-controls="p-admin" aria-selected="false" tabindex="-1">Admin Console</button></li>
+    <li role="presentation"><button role="tab" id="t-def" aria-controls="p-def" aria-selected="false" tabindex="-1">Form Definition</button></li>
+    <li role="presentation"><button role="tab" id="t-out" aria-controls="p-out" aria-selected="false" tabindex="-1">Structured Output</button></li>
+    <li role="presentation"><button role="tab" id="t-arch" aria-controls="p-arch" aria-selected="false" tabindex="-1">Architecture &amp; Accessibility</button></li>
+  </ul>
+</nav>
+
+<main id="main">
+
+<!-- ============ REPORT ============ -->
+<section id="p-report" role="tabpanel" aria-labelledby="t-report">
+  <div class="grid">
+    <div>
+      <h2 id="formHeading">Report an adverse event following vaccination</h2>
+      <p class="sub" id="formHeadingSub">Form content, validation, and branching below are generated from a single versioned form definition.</p>
+      <div id="errSummary" class="summary" tabindex="-1" hidden role="alert">
+        <h3 id="errTitle"></h3><ol id="errList"></ol></div>
+      <div id="okBox" class="ok" tabindex="-1" hidden></div>
+      <form id="form" novalidate><div id="formBody"></div>
+        <div class="panel" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="submit" class="btn" id="submitBtn">Submit report</button>
+          <button type="button" class="btn ghost" id="fillBtn">Load synthetic sample</button>
+          <button type="button" class="btn ghost" id="resetBtn">Reset</button>
+        </div>
+      </form>
+    </div>
+    <aside aria-label="Live rules engine trace">
+      <div class="trace">
+        <h3>Rules engine trace</h3>
+        <p class="sub" style="margin-bottom:10px">Every section and conditional field below is evaluated live
+          against the form definition. This is the actual branching mechanism, not a simulation of it.</p>
+        <div id="traceBody" aria-live="polite"></div>
+      </div>
+      <div class="trace" style="margin-top:14px">
+        <h3>Assistance mode</h3>
+        <div id="assistMode" aria-live="polite"></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ ADMIN ============ -->
+<section id="p-admin" role="tabpanel" aria-labelledby="t-admin" hidden>
+  <div class="panel">
+    <h2>Administrative Console — PWS Task 1.8</h2>
+    <p class="sub">Edit the form definition without a code change or deployment. Changes take effect
+      immediately in both languages. This demonstrates PRS#8: update scenarios completed without developer code changes.</p>
+    <div class="field" style="max-width:520px">
+      <label class="lab" for="adminField">Select a field to edit</label>
+      <select id="adminField"></select>
+    </div>
+    <div id="adminEditor"></div>
+  </div>
+  <div class="panel">
+    <h2>Document upload policy — Phase 1 / Phase 2 extensibility</h2>
+    <p class="sub">PWS 2.4.2 places medical-image upload in Phase 2. The accepted-type policy is configuration,
+      not code, so Phase 2 is enabled by a setting rather than a redesign.</p>
+    <div class="opt"><input type="checkbox" id="phase2"><label for="phase2">
+      Enable Phase 2 image types (DICOM, JPEG, PNG)</label></div>
+    <p><span class="pill">Accepted now:</span> <span id="typeList" class="mono"></span></p>
+  </div>
+</section>
+
+<!-- ============ DEFINITION ============ -->
+<section id="p-def" role="tabpanel" aria-labelledby="t-def" hidden>
+  <div class="panel">
+    <h2>Versioned machine-readable form definition</h2>
+    <p class="sub">One artifact drives branching, validation, both language renderings, the administrative
+      console, and the generated data dictionary. Edits in the Admin Console increment the version, and every
+      submitted record carries that version so a record stays interpretable after the instrument changes.</p>
+    <p><span class="pill" id="verPill"></span><span class="pill" id="fieldCount"></span></p>
+    <pre id="defJson" tabindex="0" aria-label="Form definition JSON"></pre>
+  </div>
+  <div class="panel">
+    <h2>Generated data dictionary</h2>
+    <p class="sub">Produced from the definition above rather than maintained alongside it, so it cannot drift
+      out of sync with what the form actually asks. Supports the Data Management Plan.</p>
+    <div style="overflow-x:auto"><table id="dict"></table></div>
+  </div>
+</section>
+
+<!-- ============ OUTPUT ============ -->
+<section id="p-out" role="tabpanel" aria-labelledby="t-out" hidden>
+  <div class="panel">
+    <h2>VAERS-compatible structured output — PWS Task 1.9</h2>
+    <p class="sub">Generated from a completed submission. Note the provenance block: form-definition version,
+      submitter type, and language of submission travel with the record, which is what allows the Government
+      to interpret it correctly years later.</p>
+    <p><span class="pill">Suppressed fields are reported explicitly</span>
+       <span class="pill">Not conflated with unanswered fields</span></p>
+    <pre id="outJson" tabindex="0" aria-label="Structured output JSON">Submit the form to generate structured output.</pre>
+  </div>
+</section>
+
+<!-- ============ ARCHITECTURE ============ -->
+<section id="p-arch" role="tabpanel" aria-labelledby="t-arch" hidden>
+  <div class="panel">
+    <h2>What this prototype demonstrates</h2>
+    <table>
+      <tr><th style="width:32%">Evaluation area</th><th>Demonstrated by</th></tr>
+      <tr><td>Understanding of the problem</td><td>Both submitter paths render from one definition. Switch the
+        submitter type on the reporting form and watch fields, wording, and required-status change.</td></tr>
+      <tr><td>Soundness and feasibility</td><td>A working rules engine, not a mock-up. The trace panel shows each
+        condition and its evaluated result in real time.</td></tr>
+      <tr><td>Innovation and originality</td><td>The Admin Console edits the same definition the form reads.
+        Change a label, help text, required flag, or branching condition and it applies immediately in
+        English and Spanish with no deployment.</td></tr>
+      <tr><td>Technical risk mitigation</td><td>Assistance is deterministic. Leave the AI toggle off and every
+        validation and guidance requirement is still met — the fallback is the primary mechanism.</td></tr>
+      <tr><td>PRS#1 — branching correctness</td><td>Select Healthcare provider, then Vaccination error with no
+        adverse event. The entire adverse-event section is suppressed and the structured output records the
+        suppression explicitly.</td></tr>
+      <tr><td>PRS#2 — responsive design</td><td>Mobile-first layout; resize to below 960px to see the single-column
+        reflow. No horizontal scrolling at 320px.</td></tr>
+      <tr><td>PRS#14 — accessibility</td><td>Operable by keyboard alone. Semantic landmarks, fieldset and legend
+        grouping, programmatic label association, aria-describedby help text, aria-invalid on errors, and a
+        focus-managed error summary.</td></tr>
+      <tr><td>PRS#19 — English and Spanish parity</td><td>Both languages render from the same definition, so a
+        field cannot exist in one language and not the other. That class of localization defect is designed out.</td></tr>
+      <tr><td>Scalability and extensibility</td><td>Phase 2 image upload is a configuration toggle in the Admin
+        Console, not a redesign.</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h2>Accessibility implementation notes</h2>
+    <ul>
+      <li>Skip-to-content link as the first focusable element.</li>
+      <li>Tab list implements the ARIA tabs pattern with arrow-key navigation and roving tabindex.</li>
+      <li>Every control has a programmatically associated label; help text is linked via <code>aria-describedby</code>.</li>
+      <li>Radio and checkbox groups use <code>fieldset</code> and <code>legend</code>, so a screen reader announces group context.</li>
+      <li>Validation errors set <code>aria-invalid</code>, are announced through a <code>role="alert"</code> summary, and each entry links to its field.</li>
+      <li>The rules trace and assistance regions use <code>aria-live="polite"</code> so changes are announced without stealing focus.</li>
+      <li>Visible focus indicator at 3px with offset; colour is never the sole carrier of meaning.</li>
+      <li>Body text meets 4.5:1 contrast; the interface is fully operable at 200% zoom.</li>
+    </ul>
+    <div class="note"><strong>Scope of this prototype.</strong> This is a front-end demonstration of the
+      architecture. It has no backend, no database, and no VAERS integration, and it stores nothing. Automated
+      WCAG scanning and manual assistive-technology testing with JAWS, ZoomText, and Dragon NaturallySpeaking
+      are performed against the delivered application under PWS 3.5, not against this demonstration.</div>
+  </div>
+</section>
+</main>
+
+<footer><div>Atavas Technologies LLC &nbsp;|&nbsp; CAGE 21AP0 &nbsp;|&nbsp; UEI QCQGBY9SBEE8 &nbsp;|&nbsp;
+Prototype for evaluation under RFQ 75D301-26-Q-00146. Synthetic data only.</div></footer>
+
+<script>
+"use strict";
+/* ============================================================
+   FORM DEFINITION — the single versioned artifact.
+   Branching, validation, both locales, the admin console and the
+   data dictionary are all driven from this one object.
+   ============================================================ */
+var DEF = {
+  id:"vaers.report",
+  version:"1.4.0",
+  locales:["en","es"],
+  documentPolicy:{
+    phase1:["PDF","DOCX","TXT","RTF"],
+    phase2:["DICOM","JPEG","PNG"],
+    phase2Enabled:false,
+    maxSizeMB:25
+  },
+  sections:[
+    { id:"submitter", label:{en:"Who is filing this report?",es:"¿Quién presenta este informe?"},
+      fields:[
+        { id:"submitterType", type:"radio", required:true,
+          label:{en:"Submitter type",es:"Tipo de declarante"},
+          help:{en:"Your answer determines which questions you are asked. Members of the public are asked fewer questions, in everyday language.",
+                es:"Su respuesta determina qué preguntas se le harán. Al público general se le hacen menos preguntas, en lenguaje cotidiano."},
+          options:[
+            {value:"public", label:{en:"Member of the public (patient, parent, or caregiver)",es:"Miembro del público (paciente, padre/madre o cuidador)"}},
+            {value:"provider", label:{en:"Healthcare provider",es:"Profesional de la salud"}}
+          ]}
+      ]},
+
+    { id:"classification", label:{en:"What are you reporting?",es:"¿Qué está informando?"},
+      showIf:{field:"submitterType",op:"eq",value:"provider"},
+      fields:[
+        { id:"reportType", type:"radio", required:true,
+          label:{en:"Report classification",es:"Clasificación del informe"},
+          help:{en:"Select 'vaccination error only' if an error occurred but the patient experienced no adverse event.",
+                es:"Seleccione 'solo error de vacunación' si ocurrió un error pero el paciente no presentó ningún evento adverso."},
+          options:[
+            {value:"ae", label:{en:"Adverse event following vaccination",es:"Evento adverso tras la vacunación"}},
+            {value:"error_only", label:{en:"Vaccination error with NO adverse event",es:"Error de vacunación SIN evento adverso"}},
+            {value:"both", label:{en:"Vaccination error that resulted in an adverse event",es:"Error de vacunación que produjo un evento adverso"}}
+          ]}
+      ]},
+
+    { id:"patient", label:{en:"About the patient",es:"Sobre el paciente"},
+      fields:[
+        { id:"patientAge", type:"text", required:true, validate:"age",
+          label:{en:"Patient age at vaccination (years)",es:"Edad del paciente al vacunarse (años)"},
+          help:{en:"Enter a number. For infants under one year, enter 0.",es:"Escriba un número. Para bebés menores de un año, escriba 0."}},
+        { id:"patientSex", type:"select", required:true,
+          label:{en:"Patient sex",es:"Sexo del paciente"},
+          options:[
+            {value:"", label:{en:"— Select —",es:"— Seleccione —"}},
+            {value:"F", label:{en:"Female",es:"Femenino"}},
+            {value:"M", label:{en:"Male",es:"Masculino"}},
+            {value:"U", label:{en:"Unknown / prefer not to say",es:"Desconocido / prefiero no decir"}}
+          ]},
+        { id:"patientState", type:"text", required:false,
+          label:{en:"State or territory",es:"Estado o territorio"},
+          help:{en:"Two-letter abbreviation, for example TN.",es:"Abreviatura de dos letras, por ejemplo TN."}}
+      ]},
+
+    { id:"vaccine", label:{en:"About the vaccine",es:"Sobre la vacuna"},
+      fields:[
+        { id:"vaccineName", type:"text", required:true,
+          label:{en:"Vaccine received",es:"Vacuna recibida"},
+          help:{en:"Brand or common name is fine. Example: influenza, MMR, Shingrix.",
+                es:"El nombre comercial o común es suficiente. Ejemplo: influenza, MMR, Shingrix."}},
+        { id:"vaxDate", type:"date", required:true, validate:"pastDate",
+          label:{en:"Date vaccine was given",es:"Fecha en que se administró la vacuna"}},
+        { id:"doseNumber", type:"select", required:false,
+          label:{en:"Which dose was this?",es:"¿Qué dosis fue esta?"},
+          options:[
+            {value:"", label:{en:"— Select —",es:"— Seleccione —"}},
+            {value:"1", label:{en:"First dose",es:"Primera dosis"}},
+            {value:"2", label:{en:"Second dose",es:"Segunda dosis"}},
+            {value:"3+", label:{en:"Third or later dose",es:"Tercera dosis o posterior"}},
+            {value:"unk", label:{en:"Not sure",es:"No estoy seguro"}}
+          ]},
+        { id:"lotNumber", type:"text", required:false,
+          showIf:{field:"submitterType",op:"eq",value:"provider"},
+          label:{en:"Lot number",es:"Número de lote"},
+          help:{en:"From the vial or the administration record.",es:"Del vial o del registro de administración."}},
+        { id:"route", type:"select", required:true,
+          showIf:{field:"submitterType",op:"eq",value:"provider"},
+          label:{en:"Route of administration",es:"Vía de administración"},
+          options:[
+            {value:"", label:{en:"— Select —",es:"— Seleccione —"}},
+            {value:"IM", label:{en:"Intramuscular",es:"Intramuscular"}},
+            {value:"SC", label:{en:"Subcutaneous",es:"Subcutánea"}},
+            {value:"ID", label:{en:"Intradermal",es:"Intradérmica"}},
+            {value:"PO", label:{en:"Oral",es:"Oral"}},
+            {value:"IN", label:{en:"Intranasal",es:"Intranasal"}}
+          ]}
+      ]},
+
+    /* Suppressed entirely for a provider filing an error-only report — PRS#1 */
+    { id:"adverse", label:{en:"What happened",es:"Qué ocurrió"},
+      showIf:{not:{allOf:[
+        {field:"submitterType",op:"eq",value:"provider"},
+        {field:"reportType",op:"eq",value:"error_only"}
+      ]}},
+      fields:[
+        { id:"onsetDate", type:"date", required:true, validate:"pastDate",
+          label:{en:"Date the problem started",es:"Fecha en que comenzó el problema"},
+          help:{en:"If you are not sure of the exact date, give your best estimate.",
+                es:"Si no está seguro de la fecha exacta, indique su mejor estimación."}},
+        { id:"aeNarrative", type:"textarea", required:true, validate:"minLen40",
+          label:{en:"Describe what happened",es:"Describa lo que ocurrió"},
+          help:{en:"Describe the signs and symptoms in your own words, and say how long they lasted. Detail here is the most useful part of your report.",
+                es:"Describa los signos y síntomas con sus propias palabras e indique cuánto duraron. El detalle aquí es la parte más útil de su informe."}},
+        { id:"outcome", type:"checkbox", required:false,
+          label:{en:"Did any of these happen? Select all that apply.",es:"¿Ocurrió alguno de estos? Seleccione todos los que correspondan."},
+          options:[
+            {value:"er", label:{en:"Emergency room or urgent care visit",es:"Visita a urgencias o atención urgente"}},
+            {value:"hosp", label:{en:"Hospital stay",es:"Hospitalización"}},
+            {value:"disab", label:{en:"Lasting disability",es:"Discapacidad permanente"}},
+            {value:"lifethr", label:{en:"Life-threatening illness",es:"Enfermedad potencialmente mortal"}},
+            {value:"died", label:{en:"Death",es:"Fallecimiento"}},
+            {value:"none", label:{en:"None of these",es:"Ninguno de estos"}}
+          ]},
+        { id:"recovered", type:"radio", required:false,
+          label:{en:"Has the patient recovered?",es:"¿Se ha recuperado el paciente?"},
+          options:[
+            {value:"y", label:{en:"Yes",es:"Sí"}},
+            {value:"n", label:{en:"No, still ongoing",es:"No, continúa"}},
+            {value:"unk", label:{en:"Not sure",es:"No estoy seguro"}}
+          ]}
+      ]},
+
+    { id:"error", label:{en:"About the vaccination error",es:"Sobre el error de vacunación"},
+      showIf:{allOf:[
+        {field:"submitterType",op:"eq",value:"provider"},
+        {field:"reportType",op:"in",value:["error_only","both"]}
+      ]},
+      fields:[
+        { id:"errorType", type:"select", required:true,
+          label:{en:"Type of error",es:"Tipo de error"},
+          options:[
+            {value:"", label:{en:"— Select —",es:"— Seleccione —"}},
+            {value:"wrong_vaccine", label:{en:"Wrong vaccine administered",es:"Se administró la vacuna equivocada"}},
+            {value:"wrong_dose", label:{en:"Incorrect dose or volume",es:"Dosis o volumen incorrecto"}},
+            {value:"expired", label:{en:"Expired product administered",es:"Se administró producto vencido"}},
+            {value:"storage", label:{en:"Storage or handling deviation",es:"Desviación de almacenamiento o manipulación"}},
+            {value:"schedule", label:{en:"Administered outside recommended schedule",es:"Administrada fuera del calendario recomendado"}}
+          ]},
+        { id:"errorNarrative", type:"textarea", required:true, validate:"minLen40",
+          label:{en:"Describe the error and any corrective action taken",es:"Describa el error y las medidas correctivas tomadas"}}
+      ]},
+
+    { id:"history", label:{en:"Medical background",es:"Antecedentes médicos"},
+      fields:[
+        { id:"histProvider", type:"textarea", required:false,
+          showIf:{field:"submitterType",op:"eq",value:"provider"},
+          label:{en:"Relevant medical history, concurrent conditions, and current medications",
+                 es:"Antecedentes médicos relevantes, afecciones concurrentes y medicamentos actuales"},
+          help:{en:"Include allergies, prior adverse reactions to vaccines, and relevant laboratory or diagnostic findings.",
+                es:"Incluya alergias, reacciones adversas previas a vacunas y hallazgos de laboratorio o diagnóstico relevantes."}},
+        { id:"histPublic", type:"textarea", required:false,
+          showIf:{field:"submitterType",op:"eq",value:"public"},
+          label:{en:"Any other health conditions or medicines we should know about?",
+                 es:"¿Alguna otra afección de salud o medicamento que debamos conocer?"},
+          help:{en:"Include allergies and any past reaction to a vaccine. It is fine to leave this blank if you are not sure.",
+                es:"Incluya alergias y cualquier reacción previa a una vacuna. Puede dejarlo en blanco si no está seguro."}}
+      ]},
+
+    { id:"documents", label:{en:"Supporting documents",es:"Documentos de apoyo"},
+      fields:[
+        { id:"docs", type:"file", required:false,
+          label:{en:"Attach supporting documents",es:"Adjunte documentos de apoyo"},
+          help:{en:"Optional. Accepted document types are set by policy and shown below.",
+                es:"Opcional. Los tipos de documento aceptados se definen por política y se muestran abajo."}}
+      ]},
+
+    { id:"reporter", label:{en:"Your contact information",es:"Su información de contacto"},
+      fields:[
+        { id:"repName", type:"text", required:true,
+          label:{en:"Your name",es:"Su nombre"}},
+        { id:"repEmail", type:"email", required:true, validate:"email",
+          label:{en:"Email address",es:"Correo electrónico"},
+          help:{en:"Used only if CDC needs to follow up about this report.",
+                es:"Se usa solo si los CDC necesitan hacer seguimiento sobre este informe."}},
+        { id:"repFacility", type:"text", required:false,
+          showIf:{field:"submitterType",op:"eq",value:"provider"},
+          label:{en:"Facility or practice name",es:"Nombre del centro o consultorio"}}
+      ]}
+  ]
+};
+
+/* Deterministic supplemental-document suggestion rules — PWS 2.3.
+   Rule-based so coverage under PRS#10 is measurable and auditable. */
+var DOC_RULES = [
+  { when:function(v){return has(v.outcome,"hosp");},
+    doc:{en:"Hospital discharge summary",es:"Resumen de alta hospitalaria"} },
+  { when:function(v){return has(v.outcome,"er");},
+    doc:{en:"Emergency department record",es:"Registro del servicio de urgencias"} },
+  { when:function(v){return has(v.outcome,"disab")||has(v.outcome,"lifethr");},
+    doc:{en:"Specialist consultation notes",es:"Notas de consulta con especialista"} },
+  { when:function(v){return v.submitterType==="provider";},
+    doc:{en:"Immunization administration record",es:"Registro de administración de la vacuna"} },
+  { when:function(v){return v.reportType==="error_only"||v.reportType==="both";},
+    doc:{en:"Incident or corrective action report",es:"Informe de incidente o acción correctiva"} },
+  { when:function(v){return has(v.outcome,"died");},
+    doc:{en:"Death certificate or autopsy report",es:"Certificado de defunción o informe de autopsia"} }
+];
+
+var UI = {
+  en:{required:"required", errTitle:"Please correct the following before submitting",
+      why:"Shown because", whyHidden:"Hidden because", always:"always shown",
+      suppressed:"SUPPRESSED", shown:"SHOWN", submit:"Submit report",
+      okTitle:"Report received (prototype)", okBody:"No data was transmitted or stored. See the Structured Output tab for the VAERS-compatible record this submission would generate.",
+      suggested:"Documents that would help", assistOn:"AI layer ON", assistOff:"AI layer OFF",
+      assistOffText:"Assistance is deterministic. Guidance, validation, and document suggestions below come from the rules engine. Every requirement is met with AI disabled.",
+      assistOnText:"In the delivered system, subject to CDC approval, this can route to Azure OpenAI within the CDC-authorized Azure environment to rephrase the same rules-engine guidance conversationally. The rules engine still decides what is required, valid, or missing. This prototype makes no model calls.",
+      chosen:"Selected", none:"No file selected", remove:"Remove", accepted:"Accepted types"},
+  es:{required:"obligatorio", errTitle:"Corrija lo siguiente antes de enviar",
+      why:"Se muestra porque", whyHidden:"Oculto porque", always:"siempre visible",
+      suppressed:"SUPRIMIDO", shown:"VISIBLE", submit:"Enviar informe",
+      okTitle:"Informe recibido (prototipo)", okBody:"No se transmitieron ni almacenaron datos. Consulte la pestaña Structured Output para ver el registro compatible con VAERS que generaría este envío.",
+      suggested:"Documentos que serían útiles", assistOn:"Capa de IA ACTIVADA", assistOff:"Capa de IA DESACTIVADA",
+      assistOffText:"La asistencia es determinista. La orientación, la validación y las sugerencias de documentos provienen del motor de reglas. Todos los requisitos se cumplen con la IA desactivada.",
+      assistOnText:"En el sistema entregado, sujeto a la aprobación de los CDC, esto puede dirigirse a Azure OpenAI dentro del entorno de Azure autorizado por los CDC para reformular la misma orientación del motor de reglas de forma conversacional. El motor de reglas sigue decidiendo qué es obligatorio, válido o falta. Este prototipo no realiza llamadas al modelo.",
+      chosen:"Seleccionado", none:"Ningún archivo seleccionado", remove:"Quitar", accepted:"Tipos aceptados"}
+};
+
+var ERRMSG = {
+  en:{required:"This field is required.", age:"Enter a whole number between 0 and 120.",
+      pastDate:"Enter a valid date that is not in the future.",
+      minLen40:"Please give at least 40 characters so the description is useful.",
+      email:"Enter a valid email address, for example name@example.com.",
+      onsetBeforeVax:"The adverse-event start date cannot be before the vaccination date.",
+      outcomeConflict:"Choose 'None of these' by itself, or select one or more specific outcomes."},
+  es:{required:"Este campo es obligatorio.", age:"Escriba un número entero entre 0 y 120.",
+      pastDate:"Escriba una fecha válida que no sea futura.",
+      minLen40:"Escriba al menos 40 caracteres para que la descripción sea útil.",
+      email:"Escriba un correo electrónico válido, por ejemplo nombre@ejemplo.com.",
+      onsetBeforeVax:"La fecha de inicio del evento adverso no puede ser anterior a la fecha de vacunación.",
+      outcomeConflict:"Seleccione 'Ninguno de estos' por sí solo, o seleccione uno o más resultados específicos."}
+};
+
+var lang="en", ai=false, values={}, files=[], errors={}, submitted=false, lastOutput=null;
+function t(){return UI[lang];}
+function has(a,v){return Array.isArray(a)&&a.indexOf(v)>-1;}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function L(o){return o?(o[lang]||o.en||""):"";}
+
+/* ---------- condition evaluator: the branching engine ---------- */
+function evalCond(c){
+  if(!c) return true;
+  if(c.not) return !evalCond(c.not);
+  if(c.allOf) return c.allOf.every(evalCond);
+  if(c.anyOf) return c.anyOf.some(evalCond);
+  var v=values[c.field];
+  switch(c.op){
+    case "eq": return v===c.value;
+    case "ne": return v!==c.value;
+    case "in": return c.value.indexOf(v)>-1;
+    case "set": return v!==undefined&&v!=="";
+    default: return true;
+  }
+}
+function condText(c){
+  if(!c) return t().always;
+  if(c.not) return "NOT ( "+condText(c.not)+" )";
+  if(c.allOf) return c.allOf.map(condText).join(" AND ");
+  if(c.anyOf) return c.anyOf.map(condText).join(" OR ");
+  if(c.op==="in") return c.field+" IN ["+c.value.join(", ")+"]";
+  if(c.op==="set") return c.field+" is answered";
+  return c.field+" "+(c.op==="eq"?"=":"≠")+" "+c.value;
+}
+function visibleSections(){return DEF.sections.filter(function(s){return evalCond(s.showIf);});}
+function visibleFields(s){return s.fields.filter(function(f){return evalCond(f.showIf);});}
+function allVisibleFields(){
+  var out=[];visibleSections().forEach(function(s){visibleFields(s).forEach(function(f){out.push(f);});});return out;}
+
+/* ---------- validation ---------- */
+function validateField(f){
+  var v=values[f.id];
+  var empty=(v===undefined||v===""||(Array.isArray(v)&&!v.length));
+  if(f.required&&empty) return ERRMSG[lang].required;
+  var m=ERRMSG[lang];
+  /* Cross-field consistency checks are blocking validation errors, not merely guidance. */
+  if(f.id==="onsetDate"&&!empty&&values.vaxDate&&new Date(v)<new Date(values.vaxDate))
+    return m.onsetBeforeVax;
+  if(f.id==="outcome"&&!empty&&has(v,"none")&&v.length>1)
+    return m.outcomeConflict;
+  if(empty||!f.validate) return null;
+  if(f.validate==="age"){var n=Number(v);if(!/^\d+$/.test(v)||n<0||n>120)return m.age;}
+  if(f.validate==="pastDate"){var d=new Date(v);if(isNaN(d)||d>new Date())return m.pastDate;}
+  if(f.validate==="minLen40"&&String(v).trim().length<40) return m.minLen40;
+  if(f.validate==="email"&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return m.email;
+  return null;
+}
+function runValidation(){
+  errors={};
+  allVisibleFields().forEach(function(f){var e=validateField(f);if(e)errors[f.id]=e;});
+  return Object.keys(errors).length===0;
+}
+
+/* ---------- deterministic assistance ---------- */
+function guidance(f){
+  var v=values[f.id];
+  if(f.id==="aeNarrative"&&v&&String(v).trim().length>0&&String(v).trim().length<40)
+    return lang==="en"
+      ? "Add how long the symptoms lasted and whether they are still happening. Reports with duration are substantially more useful to safety review."
+      : "Agregue cuánto duraron los síntomas y si continúan. Los informes con duración son mucho más útiles para la revisión de seguridad.";
+  if(f.id==="onsetDate"&&v&&values.vaxDate&&new Date(v)<new Date(values.vaxDate))
+    return lang==="en"
+      ? "The start date is before the vaccination date. Please check both dates."
+      : "La fecha de inicio es anterior a la fecha de vacunación. Verifique ambas fechas.";
+  if(f.id==="outcome"&&has(v,"none")&&v.length>1)
+    return lang==="en"
+      ? "You selected 'None of these' along with other options. Please choose one or the other."
+      : "Seleccionó 'Ninguno de estos' junto con otras opciones. Elija una u otra.";
+  if(f.id==="lotNumber"&&!v)
+    return lang==="en"
+      ? "Lot number is optional, but it lets CDC link this report to others involving the same lot."
+      : "El número de lote es opcional, pero permite a los CDC vincular este informe con otros del mismo lote.";
+  return null;
+}
+function suggestedDocs(){
+  var out=[];DOC_RULES.forEach(function(r){if(r.when(values))out.push(L(r.doc));});return out;}
+
+/* ---------- rendering ---------- */
+function renderForm(){
+  var fh=document.getElementById("formHeading");
+  if(fh) fh.textContent = lang==="es"
+    ? "Reportar un evento adverso después de la vacunación"
+    : "Report an adverse event following vaccination";
+  var fs2=document.getElementById("formHeadingSub");
+  if(fs2) fs2.textContent = lang==="es"
+    ? "El contenido, la validación y la ramificación del formulario se generan a partir de una única definición de formulario versionada."
+    : "Form content, validation, and branching below are generated from a single versioned form definition.";
+
+  var host=document.getElementById("formBody");
+  host.innerHTML="";
+  visibleSections().forEach(function(s){
+    var fs=document.createElement("fieldset");
+    fs.className="panel";
+    fs.innerHTML='<legend>'+esc(L(s.label))+'</legend>';
+    visibleFields(s).forEach(function(f){fs.appendChild(renderField(f));});
+    host.appendChild(fs);
+  });
+  var d=document.getElementById("submitBtn"); if(d) d.textContent=t().submit;
+  renderTrace(); renderAssistMode();
+}
+
+function renderField(f){
+  var w=document.createElement("div"); w.className="field";
+  var id="f_"+f.id, hid=id+"_h", eid=id+"_e";
+  var describe=[]; if(f.help)describe.push(hid); if(errors[f.id])describe.push(eid);
+  var db=describe.length?' aria-describedby="'+describe.join(" ")+'"':"";
+  var inv=errors[f.id]?' aria-invalid="true"':"";
+  var star=f.required?' <span class="req" aria-hidden="true">*</span><span class="sr">('+t().required+')</span>':"";
+  var help=f.help?'<p class="hint" id="'+hid+'">'+esc(L(f.help))+'</p>':"";
+  var v=values[f.id];
+
+  if(f.type==="radio"||f.type==="checkbox"){
+    var inner='<fieldset style="border:0;padding:0;margin:0"><legend class="grouplab" style="padding:0">'+
+      esc(L(f.label))+star+'</legend>'+help;
+    f.options.forEach(function(o,i){
+      var oid=id+"_"+i;
+      var chk=f.type==="radio"?(v===o.value):has(v,o.value);
+      inner+='<div class="opt"><input type="'+f.type+'" id="'+oid+'" name="'+id+'" value="'+
+        esc(o.value)+'"'+(chk?" checked":"")+inv+db+'><label for="'+oid+'">'+esc(L(o.label))+'</label></div>';
+    });
+    inner+='</fieldset>';
+    w.innerHTML=inner;
+  } else if(f.type==="select"){
+    var opts="";
+    f.options.forEach(function(o){
+      opts+='<option value="'+esc(o.value)+'"'+(v===o.value?" selected":"")+'>'+esc(L(o.label))+'</option>';});
+    w.innerHTML='<label class="lab" for="'+id+'">'+esc(L(f.label))+star+'</label>'+help+
+      '<select id="'+id+'"'+inv+db+'>'+opts+'</select>';
+  } else if(f.type==="textarea"){
+    w.innerHTML='<label class="lab" for="'+id+'">'+esc(L(f.label))+star+'</label>'+help+
+      '<textarea id="'+id+'"'+inv+db+'>'+esc(v||"")+'</textarea>';
+  } else if(f.type==="file"){
+    var types=DEF.documentPolicy.phase1.concat(
+      DEF.documentPolicy.phase2Enabled?DEF.documentPolicy.phase2:[]);
+    var list="";
+    files.forEach(function(fl,i){
+      list+='<li><span>'+esc(fl)+'</span><button type="button" class="btn ghost sm" data-rm="'+i+'">'+
+        t().remove+'</button></li>';});
+    w.innerHTML='<label class="lab" for="'+id+'">'+esc(L(f.label))+star+'</label>'+help+
+      '<div class="file"><p style="margin:0 0 8px"><span class="pill">'+t().accepted+': '+
+      esc(types.join(", "))+'</span><span class="pill">max '+DEF.documentPolicy.maxSizeMB+' MB</span></p>'+
+      '<button type="button" class="btn ghost" id="addDoc">+ '+esc(L(f.label))+'</button></div>'+
+      (list?'<ul class="docs">'+list+'</ul>':'');
+  } else {
+    w.innerHTML='<label class="lab" for="'+id+'">'+esc(L(f.label))+star+'</label>'+help+
+      '<input type="'+(f.type==="date"?"date":f.type==="email"?"email":"text")+'" id="'+id+'"'+
+      inv+db+' value="'+esc(v||"")+'">';
+  }
+
+  if(errors[f.id])
+    w.insertAdjacentHTML("beforeend",'<span class="err" id="'+eid+'">'+esc(errors[f.id])+'</span>');
+  var g=guidance(f);
+  if(g) w.insertAdjacentHTML("beforeend",
+    '<div class="assist"><strong>'+(ai?t().assistOn:t().assistOff)+'</strong>'+esc(g)+'</div>');
+
+  if(f.id==="docs"){
+    var sd=suggestedDocs();
+    if(sd.length){
+      var li=sd.map(function(x){return "<li>"+esc(x)+"</li>";}).join("");
+      w.insertAdjacentHTML("beforeend",'<div class="assist"><strong>'+t().suggested+
+        ' — PWS 2.3</strong><ul style="margin:4px 0 0;padding-left:18px">'+li+'</ul></div>');
+    }
+  }
+  return w;
+}
+
+function renderTrace(){
+  var h="";
+  DEF.sections.forEach(function(s){
+    var vis=evalCond(s.showIf);
+    h+='<div class="trow"><span class="tname">'+esc(L(s.label))+'</span> '+
+       '<span class="'+(vis?"yes":"no")+'">'+(vis?t().shown:t().suppressed)+'</span>'+
+       '<code class="cond">'+esc((vis?t().why:t().whyHidden)+": "+condText(s.showIf))+'</code>';
+    if(vis) s.fields.forEach(function(f){
+      if(!f.showIf) return;
+      var fv=evalCond(f.showIf);
+      h+='<div style="margin:5px 0 0 12px"><span class="mono">'+esc(f.id)+'</span> '+
+         '<span class="'+(fv?"yes":"no")+'">'+(fv?t().shown:t().suppressed)+'</span>'+
+         '<code class="cond">'+esc(condText(f.showIf))+'</code></div>';
+    });
+    h+='</div>';
+  });
+  document.getElementById("traceBody").innerHTML=h;
+}
+
+function renderAssistMode(){
+  document.getElementById("assistMode").innerHTML=
+    '<p><span class="pill '+(ai?"on":"off")+'">'+(ai?t().assistOn:t().assistOff)+'</span></p>'+
+    '<p style="margin:0">'+esc(ai?t().assistOnText:t().assistOffText)+'</p>';
+}
+
+/* ---------- definition + dictionary views ---------- */
+function renderDef(){
+  document.getElementById("defJson").textContent=JSON.stringify(DEF,null,2);
+  document.getElementById("verPill").textContent="version "+DEF.version;
+  var n=0;DEF.sections.forEach(function(s){n+=s.fields.length;});
+  document.getElementById("fieldCount").textContent=n+" fields, "+DEF.sections.length+" sections";
+  var rows='<tr><th>Field</th><th>Type</th><th>Required</th><th>Presented when</th><th>Validation</th></tr>';
+  DEF.sections.forEach(function(s){
+    s.fields.forEach(function(f){
+      var cond=[]; if(s.showIf)cond.push(condText(s.showIf)); if(f.showIf)cond.push(condText(f.showIf));
+      rows+='<tr><td class="mono">'+esc(f.id)+'</td><td>'+esc(f.type)+'</td><td>'+
+        (f.required?"Yes":"No")+'</td><td class="mono" style="font-size:.78rem">'+
+        esc(cond.length?cond.join(" AND "):"always")+'</td><td>'+esc(f.validate||"—")+'</td></tr>';
+    });
+  });
+  document.getElementById("dict").innerHTML=rows;
+  document.getElementById("typeList").textContent=DEF.documentPolicy.phase1.concat(
+    DEF.documentPolicy.phase2Enabled?DEF.documentPolicy.phase2:[]).join(", ");
+}
+
+/* ---------- admin console ---------- */
+function renderAdmin(){
+  var sel=document.getElementById("adminField");
+  if(!sel.options.length){
+    DEF.sections.forEach(function(s){
+      s.fields.forEach(function(f){
+        var o=document.createElement("option");
+        o.value=f.id;o.textContent=L(s.label)+" › "+f.id;sel.appendChild(o);});});
+  }
+  var f=findField(sel.value||sel.options[0].value);
+  if(!f){document.getElementById("adminEditor").innerHTML="";return;}
+  document.getElementById("adminEditor").innerHTML=
+    '<div class="adminrow">'+
+    '<div class="field"><label class="lab" for="aLabEn">Label (English)</label>'+
+      '<input type="text" id="aLabEn" value="'+esc(f.label.en||"")+'"></div>'+
+    '<div class="field"><label class="lab" for="aLabEs">Label (Español)</label>'+
+      '<input type="text" id="aLabEs" value="'+esc(f.label.es||"")+'"></div>'+
+    '<div class="field"><label class="lab" for="aHelpEn">Help text (English)</label>'+
+      '<textarea id="aHelpEn" style="min-height:64px">'+esc(f.help&&f.help.en||"")+'</textarea></div>'+
+    '<div class="field"><label class="lab" for="aHelpEs">Help text (Español)</label>'+
+      '<textarea id="aHelpEs" style="min-height:64px">'+esc(f.help&&f.help.es||"")+'</textarea></div>'+
+    '</div>'+
+    '<div class="opt"><input type="checkbox" id="aReq"'+(f.required?" checked":"")+
+      '><label for="aReq">Required field</label></div>'+
+    '<div class="field" style="max-width:520px"><label class="lab" for="aCond">Branching condition</label>'+
+      '<select id="aCond">'+
+      '<option value="">Always shown</option>'+
+      '<option value="public"'+(condIs(f,"public")?" selected":"")+'>Only for members of the public</option>'+
+      '<option value="provider"'+(condIs(f,"provider")?" selected":"")+'>Only for healthcare providers</option>'+
+      '</select></div>'+
+    '<button type="button" class="btn" id="aApply">Apply change</button>'+
+    '<div class="note">Applying a change increments the definition version and updates the live form, both '+
+    'language renderings, and the generated data dictionary at once. No code change, no deployment.</div>';
+
+  document.getElementById("aApply").onclick=function(){
+    f.label.en=document.getElementById("aLabEn").value;
+    f.label.es=document.getElementById("aLabEs").value;
+    var he=document.getElementById("aHelpEn").value, hs=document.getElementById("aHelpEs").value;
+    if(he||hs){f.help=f.help||{};f.help.en=he;f.help.es=hs;} else {delete f.help;}
+    f.required=document.getElementById("aReq").checked;
+    var c=document.getElementById("aCond").value;
+    if(!c) delete f.showIf; else f.showIf={field:"submitterType",op:"eq",value:c};
+    bumpVersion(); renderAll();
+    announce("Change applied. Definition is now version "+DEF.version+".");
+  };
+}
+function condIs(f,v){return f.showIf&&f.showIf.field==="submitterType"&&f.showIf.value===v;}
+function findField(id){
+  var r=null;DEF.sections.forEach(function(s){s.fields.forEach(function(f){if(f.id===id)r=f;});});return r;}
+function bumpVersion(){
+  var p=DEF.version.split(".");p[2]=String(Number(p[2])+1);DEF.version=p.join(".");}
+function announce(msg){
+  var el=document.getElementById("assistMode");
+  var d=document.createElement("p");d.textContent=msg;d.style.fontWeight="700";
+  el.appendChild(d);setTimeout(function(){if(d.parentNode)d.parentNode.removeChild(d);},4000);
+}
+
+/* ---------- output ---------- */
+function buildOutput(){
+  var vis={}, suppressed=[];
+  allVisibleFields().forEach(function(f){vis[f.id]=true;});
+  DEF.sections.forEach(function(s){
+    s.fields.forEach(function(f){
+      if(!vis[f.id]) suppressed.push(f.id);});});
+  var data={};
+  allVisibleFields().forEach(function(f){
+    if(f.type==="file"){data.attachments=files.slice();return;}
+    if(values[f.id]!==undefined&&values[f.id]!=="") data[f.id]=values[f.id];});
+  return {
+    recordType:"VAERS_REPORT_SUBMISSION",
+    provenance:{
+      formDefinitionId:DEF.id,
+      formDefinitionVersion:DEF.version,
+      submitterType:values.submitterType||null,
+      languageOfSubmission:lang,
+      collectionMethod:values.submitterType==="provider"
+        ? "healthcare-provider self-report, web form"
+        : "public self-report, web form",
+      assistanceLayer: ai?"rules-engine + AI phrasing":"rules-engine only",
+      submittedAt:new Date().toISOString(),
+      dataClassification:"SYNTHETIC — PROTOTYPE ONLY"
+    },
+    data:data,
+    fieldsSuppressedByBranching:suppressed,
+    suppressionNote:"Suppressed fields were never presented to the submitter. Absence is not a negative finding and must not be interpreted as one.",
+    suggestedSupplementalDocuments:suggestedDocs()
+  };
+}
+
+/* ---------- events ---------- */
+function onFieldInput(e){
+  var id=e.target.id||"";
+  if(id.indexOf("f_")!==0) return;
+  var fid=id.slice(2).split("_")[0];
+  var f=findField(fid)||findField(id.slice(2));
+  if(!f) return;
+
+  if(f.type==="checkbox"){
+    var arr=[];document.querySelectorAll('input[name="f_'+f.id+'"]:checked').forEach(function(n){arr.push(n.value);});
+    values[f.id]=arr;
+  } else if(f.type==="radio"){
+    values[f.id]=e.target.value;
+  } else {
+    values[f.id]=e.target.value;
+  }
+
+  if(submitted) runValidation();
+
+  /* Do not rebuild the form on every keystroke. Recreating a textarea/input
+     during the input event resets the caret/focus in some browsers and makes
+     normal typing appear broken. Text-like controls keep their live DOM value
+     while the user types; we re-render on change/blur. Controls that can alter
+     branching still re-render immediately. */
+  var textLike = (f.type==="textarea" || f.type==="text" || f.type==="email" ||
+                  f.type==="tel" || f.type==="date");
+  if(e.type==="input" && textLike) return;
+
+  var active=document.activeElement?document.activeElement.id:null;
+  renderForm();
+  if(active){
+    var el=document.getElementById(active);
+    if(el){
+      el.focus();
+      if(el.setSelectionRange && (el.tagName==="TEXTAREA" || el.type==="text" || el.type==="email" || el.type==="tel")){
+        try{var n=el.value.length;el.setSelectionRange(n,n);}catch(x){}
+      }
+    }
+  }
+}
+/* Text-like fields update state on each input event without rebuilding the DOM,
+   then re-render on change/blur. Select/radio/checkbox controls continue to
+   re-render immediately so branching remains live. */
+document.addEventListener("input", onFieldInput);
+document.addEventListener("change", onFieldInput);
+
+document.addEventListener("click",function(e){
+  var rm=e.target.getAttribute&&e.target.getAttribute("data-rm");
+  if(rm!==null&&rm!==undefined){files.splice(Number(rm),1);renderForm();return;}
+  if(e.target.id==="addDoc"){
+    var types=DEF.documentPolicy.phase1.concat(
+      DEF.documentPolicy.phase2Enabled?DEF.documentPolicy.phase2:[]);
+    files.push("synthetic_record_"+(files.length+1)+"."+types[files.length%types.length].toLowerCase());
+    renderForm();return;
+  }
+});
+
+document.getElementById("form").addEventListener("submit",function(e){
+  e.preventDefault(); submitted=true;
+  var ok=runValidation(); renderForm();
+  var sum=document.getElementById("errSummary"), box=document.getElementById("okBox");
+  if(!ok){
+    box.hidden=true;
+    document.getElementById("errTitle").textContent=t().errTitle;
+    var ol=document.getElementById("errList"); ol.innerHTML="";
+    allVisibleFields().forEach(function(f){
+      if(!errors[f.id])return;
+      var li=document.createElement("li");
+      li.innerHTML='<a href="#f_'+f.id+'">'+esc(L(f.label))+" — "+esc(errors[f.id])+'</a>';
+      ol.appendChild(li);
+    });
+    sum.hidden=false; sum.focus();
+  } else {
+    sum.hidden=true;
+    lastOutput=buildOutput();
+    document.getElementById("outJson").textContent=JSON.stringify(lastOutput,null,2);
+    box.innerHTML='<h2>'+esc(t().okTitle)+'</h2><p>'+esc(t().okBody)+'</p>';
+    box.hidden=false; box.focus();
+  }
+});
+
+document.getElementById("resetBtn").onclick=function(){
+  values={};files=[];errors={};submitted=false;lastOutput=null;
+  document.getElementById("errSummary").hidden=true;
+  document.getElementById("okBox").hidden=true;
+  document.getElementById("outJson").textContent="Submit the form to generate structured output.";
+  renderAll();
+};
+document.getElementById("fillBtn").onclick=function(){
+  values={submitterType:"provider",reportType:"both",patientAge:"34",patientSex:"F",patientState:"TN",
+    vaccineName:"Influenza (quadrivalent)",vaxDate:"2026-08-14",doseNumber:"1",lotNumber:"SYN-4471A",route:"IM",
+    onsetDate:"2026-08-15",
+    aeNarrative:"Patient developed localized swelling and low-grade fever approximately 18 hours after administration. Symptoms resolved within 72 hours without intervention.",
+    outcome:["er"],recovered:"y",errorType:"wrong_dose",
+    errorNarrative:"Half-dose volume drawn due to syringe misread. Error identified at post-administration check; patient notified and monitored.",
+    histProvider:"No known drug allergies. No prior adverse reaction to vaccination.",
+    repName:"Synthetic Test Reporter",repEmail:"synthetic@example.com",repFacility:"Synthetic Family Practice"};
+  files=["synthetic_record_1.pdf"];submitted=false;errors={};renderAll();
+};
+document.getElementById("lang").onchange=function(e){
+  lang=e.target.value;document.documentElement.lang=lang;
+  if(submitted)runValidation();renderAll();};
+document.getElementById("aiToggle").onchange=function(e){ai=e.target.checked;renderForm();};
+document.getElementById("phase2").onchange=function(e){
+  DEF.documentPolicy.phase2Enabled=e.target.checked;bumpVersion();renderAll();};
+document.getElementById("adminField").onchange=renderAdmin;
+
+/* ---------- tabs: ARIA pattern with roving tabindex ---------- */
+var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+function selectTab(btn){
+  tabs.forEach(function(b){
+    var on=b===btn;
+    b.setAttribute("aria-selected",on?"true":"false");
+    b.tabIndex=on?0:-1;
+    document.getElementById(b.getAttribute("aria-controls")).hidden=!on;
+  });
+  btn.focus();
+  if(btn.id==="t-admin")renderAdmin();
+  if(btn.id==="t-def")renderDef();
+}
+tabs.forEach(function(b,i){
+  b.addEventListener("click",function(){selectTab(b);});
+  b.addEventListener("keydown",function(e){
+    var k=e.key,n=null;
+    if(k==="ArrowRight")n=tabs[(i+1)%tabs.length];
+    if(k==="ArrowLeft")n=tabs[(i-1+tabs.length)%tabs.length];
+    if(k==="Home")n=tabs[0];
+    if(k==="End")n=tabs[tabs.length-1];
+    if(n){e.preventDefault();selectTab(n);}
+  });
+});
+
+function renderAll(){renderForm();renderDef();
+  if(!document.getElementById("p-admin").hidden)renderAdmin();}
+renderAll();
+</script>
+</body>
+</html>
